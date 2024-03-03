@@ -1,5 +1,5 @@
 import express, { Application } from 'express';
-const morgan = require('morgan');
+import morgan from 'morgan';
 import cors from 'cors';
 import helmet from 'helmet';
 import indexRoutes from '../routes/index.routes';

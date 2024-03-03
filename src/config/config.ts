@@ -8,7 +8,7 @@ const getConnection = async function getConnection() {
             return connection;
         }
 
-        const dataB64 = process.env.B64;
+        const dataB64 = "ewogICAiYWNjZXNzVXJsIjoiaHR0cHM6Ly9uaXNzYW5uZXh0Z2VuLnVzLWVhc3QtMS5wcml2YXRlbGluay5zbm93Zmxha2Vjb21wdXRpbmcuY29tIiwKICAgImluc2VjdXJlQ29ubmVjdCI6dHJ1ZSwKICAgImFjY291bnQiOiJOSVNTQU5BTUVSSUNBUy1OSVNTQU5ORVhUR0VOIiwKICAgInVzZXJuYW1lIjoiTklEU19MQU1CREFfV0VCQVBQX1NWQ19QUkQiLAogICAicGFzc3dvcmQiOiIqJW4uVC1fMkA0I1U3eUAuNX5ja2EpTzkjSWtMVEAodl4kUiIsCiAgICJkYXRhYmFzZSI6IlNQREJOSURTIiwKICAgInNjaGVtYSI6Ik5JRFNfU1RHIgp9";
 
         let buff = Buffer.from(dataB64, 'base64');
         let text = buff.toString('ascii');

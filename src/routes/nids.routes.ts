@@ -1,10 +1,13 @@
 import { Request, Response, Router } from 'express';
 import Utils from "../utils/utils";
+import userRepository from "../repository/user.repository";
+const XLSX = require('xlsx');
 
 const router = Router();
 
 router.post('/', async (req: Request, res: Response, next) => {
     try {
+        console.log('Entrando')
         // Validate Token
         const headers = req.headers;
         const queryParams = req.query;
@@ -13,83 +16,87 @@ router.post('/', async (req: Request, res: Response, next) => {
         const requestData = req.body;
 
         const token = await Utils.decodeToken(headers);
+        console.log(token)
 
         // Validar Body
         const base64Data = requestData.base64Data;
         if (!base64Data) return Utils.errorResponse(500, "Invalid Body", res);
-        //
-        // // Separar y obtener el base64
-        // const base64ContentArray = base64Data.split(';base64,');
-        // const base64Content = base64ContentArray.length > 1 ? base64ContentArray[1] : base64ContentArray[0];
-        //
-        // // Decodificar base64 a un buffer
-        // const buffer = Buffer.from(base64Content, 'base64');
-        //
-        // // Leer el archivo Excel desde el buffer
-        // const workbook = XLSX.read(buffer, {type: 'buffer'});
-        //
-        // // Suponiendo que solo hay una hoja y quieres los datos de esa hoja
-        // const firstSheetName = workbook.SheetNames[0];
-        // const worksheet = workbook.Sheets[firstSheetName];
-        //
-        // // Convertir la hoja de Excel a JSON
-        // const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        //
-        // // For Vehicle
-        // const status = {
-        //     "FACTURA NLAC": 4,
-        //     "PUERTO": 8,
-        //     "RECINTO FISCAL": 10,
-        //     "VPC": 12,
-        //     "DEALER": 14
-        //
-        // }
-        //
-        // // For NSC Invoice
-        // const salesType = {
-        //     'T': 1,
-        //     'F': 2,
-        //     'E': 3
-        // };
-        //
-        // // Variables
-        // let productions = [];
-        // let salesArr = [];
-        // let invoices = [];
-        // let nscInvoices = [];
-        // let shipments = [];
-        // let events = [];
-        // const nDate = new Date();
-        // nDate.setHours(6, 0, 0, 0);
-        // let plant;
-        //
+
+        // Separar y obtener el base64
+        const base64ContentArray = base64Data.split(';base64,');
+        const base64Content = base64ContentArray.length > 1 ? base64ContentArray[1] : base64ContentArray[0];
+
+        // Decodificar base64 a un buffer
+        const buffer = Buffer.from(base64Content, 'base64');
+
+        // Leer el archivo Excel desde el buffer
+        const workbook = XLSX.read(buffer, {type: 'buffer'});
+
+        // Suponiendo que solo hay una hoja y quieres los datos de esa hoja
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // Convertir la hoja de Excel a JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        console.log(jsonData)
+
+        // For Vehicle
+        const status = {
+            "FACTURA NLAC": 4,
+            "PUERTO": 8,
+            "RECINTO FISCAL": 10,
+            "VPC": 12,
+            "DEALER": 14
+
+        }
+
+        // For NSC Invoice
+        const salesType = {
+            'T': 1,
+            'F': 2,
+            'E': 3
+        };
+
+        // Variables
+        let productions = [];
+        let salesArr = [];
+        let invoices = [];
+        let nscInvoices = [];
+        let shipments = [];
+        let events = [];
+        const nDate = new Date();
+        nDate.setHours(6, 0, 0, 0);
+        let plant;
+
         // await userRepository.executeQuery(`BEGIN;`)
-        //
-        // for (const row of jsonData) {
-        //     // Validate Vin Length
-        //     if (row.VIN.length !== 17) {
-        //         errores.push({vin: row.VIN, error: "The VIN must be 17 characters"});
-        //         continue;
-        //     }
-        //
-        //     // Variables
-        //     const origen = row['ORIGEN DE PRODUCCION'] || '';
-        //     let por;
-        //     const sales = row['SALES NOTE'] || '';
-        //
-        //     // Validate Vin In Vehicle or Insert
-        //     const vehicle = await userRepository.validateVehicle(row.VIN);
-        //     if (vehicle.length === 0) {
-        //         plant = await userRepository.getPorFromPlant(row['ORIGEN DE PRODUCCION'])
-        //         if(plant.length === 0 ) {
-        //             errores.push({vin: row.VIN, error: "Invalid Plant Code"});
-        //             continue;
-        //         }
-        //         por = plant[0].POR_CODE;
-        //         const estatus = status[row.ESTATUS] || 0;
-        //         await userRepository.insertVehicle(row.VIN, row.MOTOR, row['END ITEM'], row['CVE COL EXT'], row['CVE COL INT'],
-        //             row.MOTOR.substring(0, 4), row.CUOTA, token.user.userId, por, origen, estatus, nDate.toISOString());
-        //     }
+
+        for (const row of jsonData) {
+            // Validate Vin Length
+            if (row.VIN.length !== 17) {
+                errores.push({vin: row.VIN, error: "The VIN must be 17 characters"});
+                continue;
+            }
+
+            // Variables
+            const origen = row['ORIGEN DE PRODUCCION'] || '';
+            let por;
+            const sales = row['SALES NOTE'] || '';
+
+            // Validate Vin In Vehicle or Insert
+            console.log(row.VIN)
+            const vehicle: any = await userRepository.validateVehicle(row.VIN);
+            console.log(vehicle)
+            // if (vehicle.length === 0) {
+            //     plant = await userRepository.getPorFromPlant(row['ORIGEN DE PRODUCCION'])
+            //     if(plant.length === 0 ) {
+            //         errores.push({vin: row.VIN, error: "Invalid Plant Code"});
+            //         continue;
+            //     }
+            //     por = plant[0].POR_CODE;
+            //     const estatus = status[row.ESTATUS] || 0;
+            //     await userRepository.insertVehicle(row.VIN, row.MOTOR, row['END ITEM'], row['CVE COL EXT'], row['CVE COL INT'],
+            //         row.MOTOR.substring(0, 4), row.CUOTA, token.user.userId, por, origen, estatus, nDate.toISOString());
+            // }
         //
         //     // Get Id's
         //     const dateInvoice = await Utils.convertToSpecificTime(row['FECHA FACTURA NISSAN'].toString());
@@ -247,7 +254,7 @@ router.post('/', async (req: Request, res: Response, next) => {
         //             SALES_TYPE_ID: vmc
         //         });
         //     }
-        // }
+        }
         // await userRepository.executeQuery(`COMMIT;`)
         //
         // await userRepository.executeQuery(`BEGIN;`)
