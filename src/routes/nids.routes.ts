@@ -64,8 +64,6 @@ router.post('/', async (req: Request, res: Response, next) => {
         let events = [];
         const nDate = new Date();
         nDate.setHours(6, 0, 0, 0);
-        console.log(nDate.toISOString())
-        let plant;
 
         await userRepository.executeQuery(`BEGIN;`)
 
@@ -109,7 +107,7 @@ router.post('/', async (req: Request, res: Response, next) => {
             let buyer;
             if (!lastVehicle[0].PRODUCCTION_ID || !lastVehicle[0].SALE_ID || !lastVehicle[0].NSC_INVOICE_ID) {
                 buyer = await userRepository.getBuyerCode(row['CVE NSC']);
-                if (buyer.length === 0) {
+                if (buyer === 0) {
                     errores.push({vin: row.VIN, error: "The NSC Does Not Exist"});
                     continue;
                 }
@@ -122,7 +120,7 @@ router.post('/', async (req: Request, res: Response, next) => {
                     productions.push({
                         PRODUCTION_TYPE: 'ACTUAL',
                         PRODUCTION_ORDER_REGION_CODE: por,
-                        BUYER_CODE: buyer[0].BUYER_CODE,
+                        BUYER_CODE: buyer.BUYER_CODE,
                         VIN: row.VIN,
                         START_PORT: row['CVE PUERTO ORIGEN'],
                         END_PORT: row['CLAVE PUERTO DESTINO'],
@@ -173,7 +171,7 @@ router.post('/', async (req: Request, res: Response, next) => {
                 const dateEntrega = Utils.convertToSpecificTime(row['FECHA ENTREGA A VENTAS'].toString());
                 salesArr.push({
                     VIN: row.VIN,
-                    NSC_ID: buyer[0].BUYER_ID,
+                    NSC_ID: buyer.BUYER_ID,
                     DELIVERY_DATE: dateEntrega.toISOString(),
                     NOTES: sales
                 });
@@ -245,7 +243,7 @@ router.post('/', async (req: Request, res: Response, next) => {
                 const eventId = await userRepository.getEventByNameType(row.VIN, 6);
                 nscInvoices.push({
                     VIN: row.VIN,
-                    BUYER_CODE: buyer[0].BUYER_CODE,
+                    BUYER_CODE: buyer.BUYER_CODE,
                     INVOICE_CODE: row['FECHA FACTURA NISSAN'],
                     EVENT_ID: eventId[0].EVENT_ID,
                     SALES_TYPE_ID: vmc

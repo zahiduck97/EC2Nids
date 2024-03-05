@@ -2,6 +2,9 @@ import Utils from "../utils/utils";
 
 const Users = () => {};
 
+const buyerCodeMap = new Map();
+const plantCodeMap = new Map();
+
 Users.executeQuery = async (Query) => {
     try {
         console.info("✅ executeQuery: ", Query);
@@ -26,10 +29,15 @@ Users.validateVehicle = async (vin) => {
 Users.getPorFromPlant = async (code) => {
     // console.info("✅ getPorFromPlant: ", code);
     try {
+        if (plantCodeMap.has(code)) return plantCodeMap.get(code)
         const sqlInsert = `SELECT POR_CODE FROM PLANT WHERE PLANT_CODE = '${code}' LIMIT 1`;
 
-        const queryResult = Utils.ExecSQL(sqlInsert);
-        return (queryResult);
+        const queryResult = await Utils.ExecSQL(sqlInsert);
+        if (queryResult.length > 0) {
+            const aux = queryResult[0].POR_CODE;
+            plantCodeMap.set(code, aux);
+            return (aux);
+        } else return 0
     } catch (err) {
         console.error("ERROR: ", err);
         throw (err);
@@ -74,10 +82,15 @@ Users.getIdsForVehicle = async (vin, code) => {
 Users.getBuyerCode = async (nsc) => {
     // console.info("✅ getBuyerCode: ", nsc);
     try {
+        if (buyerCodeMap.has(nsc)) return buyerCodeMap.get(nsc);
         const sqlInsert = `SELECT BUYER_CODE, BUYER_ID FROM BUYER WHERE BUYER_CODE ='${nsc}' LIMIT 1`;
 
-        const queryResult = Utils.ExecSQL(sqlInsert);
-        return(queryResult);
+        const queryResult = await Utils.ExecSQL(sqlInsert);
+        if (queryResult.length > 0) {
+            const aux = queryResult[0];
+            buyerCodeMap.set(nsc, aux);
+            return(aux);
+        } else return 0
     } catch (err) {
         console.error("ERROR: ", err);
         throw(err);
