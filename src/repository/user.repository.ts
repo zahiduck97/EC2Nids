@@ -1,4 +1,5 @@
 import Utils from "../utils/utils";
+import {throws} from "assert";
 
 const Users = () => {};
 
@@ -252,6 +253,134 @@ Users.insertNscInvoiceMasive = async (records, userId, date) => {
     }
 };
 
+Users.findVehicleByVin = async (vin) => {
+    console.info("✅ findVehicleByVin: ", vin);
+    try {
+        const sqlInsert = `SELECT POR  FROM VEHICLE WHERE VIN = '${vin}'`;
+        return await Utils.ExecSQL(sqlInsert);
+    } catch (err) {
+        console.error("ERROR: ", err);
+        throw err;
+    }
+};
+
+Users.findProductionByVinAndGetDate = async (vin, rolId, countryId) => {
+    return new Promise((resolve, reject) => {
+        // console.info("✅ findProductionByVinAndGetDate: ", vin, rolId, countryId);
+        try {
+            const sqlInsert = (rolId !== 1) ?
+                `SELECT PRODUCCTION_ID, PLANNED_ACTUAL_OFFLINE_DATE 
+                FROM PRODUCTION 
+                INNER JOIN BUYER ON BUYER.BUYER_CODE = PRODUCTION.BUYER_CODE
+                INNER JOIN NSC ON BUYER.NSC_ID = NSC.NSC_ID
+                WHERE VIN LIKE('${vin}') AND NSC.COUNTRY_ID = ${countryId} LIMIT 1`
+                : `SELECT PRODUCCTION_ID, PLANNED_ACTUAL_OFFLINE_DATE FROM PRODUCTION WHERE VIN LIKE('${vin}') LIMIT 1`;
+
+            const queryResult = Utils.ExecSQL(sqlInsert);
+            resolve(queryResult);
+        } catch (err) {
+            console.error("ERROR: ", err);
+            reject(err);
+        }
+    });
+};
+
+Users.getPermisosById = async (id) => {
+    return new Promise((resolve, reject) => {
+        // console.info("✅ getPermisosById: ", id);
+        try {
+            const sqlInsert = `SELECT ROLES.WRITE_PERMITION  FROM ROLES INNER JOIN USERS ON ROLES.ID = USERS.ROL_ID WHERE USERS.ID = ${id} `
+            const queryResult = Utils.ExecSQL(sqlInsert);
+            resolve(queryResult);
+        } catch (err) {
+            console.error("ERROR: ", err);
+            reject(err);
+        }
+    });
+};
+
+Users.countEventByNameType = async (vin, code) => {
+    return new Promise((resolve, reject) => {
+        // console.info("✅ countEventByNameType: ", vin, code);
+        try {
+            const sqlInsert = `SELECT COUNT(*) AS COUNT FROM EVENT WHERE ACTIVE=TRUE AND VIN_TEMP LIKE('${vin}') AND TYPE = ${code}`;
+            const queryResult = Utils.ExecSQL(sqlInsert);
+            resolve(queryResult);
+        } catch (err) {
+            console.error("ERROR: ", err);
+            reject(err);
+        }
+    });
+};
+
+Users.getLastEventId = async () => {
+    return new Promise((resolve, reject) => {
+        // console.info("✅ getLastEventId: ");
+        try {
+            const sqlInsert = `SELECT EVENT_ID FROM EVENT ORDER BY EVENT_ID DESC LIMIT 1`
+
+            const queryResult = Utils.ExecSQL(sqlInsert);
+            resolve(queryResult);
+        } catch (err) {
+            console.error("ERROR: ", err);
+            reject(err);
+        }
+    });
+};
+
+Users.insertEventMasive = async (records, userId, date) => {
+    try {
+        console.info(`✅ insertEventMasive`);
+        const valuesString = records.map(record =>
+            `(${record.TYPE}, '${record.CODE}', '${record.NAME}', '${record.EVENT_DATE}', true, ${userId}, '${date}',
+                ${userId}, '${date}', '${record.VIN_TEMP}')`
+        ).join(', ');
+        const sqlInsert = `INSERT INTO EVENT (TYPE, CODE, NAME, EVENT_DATE, ACTIVE, CREATED_BY, CREATION_DATE, LAST_UPDATED_BY,
+            LAST_UPDATE_DATE, VIN_TEMP) VALUES ${valuesString}`;
+
+        const queryResult = Utils.ExecSQL(sqlInsert);
+        return (queryResult);
+    } catch (err) {
+        console.error("ERROR: ", err);
+        throw(err);
+    }
+};
+
+Users.updateVehicleStatusMasive = async (records, userId, date) => {
+    try {
+        console.info(`✅ updateVehicleStatusMasive`);
+        await Users.executeQuery(`CREATE TEMPORARY TABLE status_vehicle_temp (VIN VARCHAR, STATUS VARCHAR);`)
+
+        const valuesString = records.map(record => `('${record.VIN}', '${record.STATUS}')`).join(', ');
+        const sqlInsert = `INSERT INTO status_vehicle_temp (VIN, STATUS) VALUES ${valuesString}`;
+        await Utils.ExecSQL(sqlInsert);
+
+        const queryResult = await Users.executeQuery(`UPDATE VEHICLE SET VEHICLE.STATUS = status_vehicle_temp.STATUS,
+            VEHICLE.LAST_UPDATED_BY = ${userId}, LAST_UPDATE_DATE='${date}'
+            FROM status_vehicle_temp WHERE VEHICLE.VIN = status_vehicle_temp.VIN;`)
+        return (queryResult);
+    } catch (err) {
+        console.error("ERROR: ", err);
+        throw(err);
+    }
+};
+
+Users.updateVehicleStatus = async (status, vin, userId) => {
+    return new Promise((resolve, reject) => {
+        console.info("✅ updateVehicleStatus: ", status, vin, userId);
+        try {
+            const date = new Date();
+            date.setHours(6, 0, 0, 0);
+            const sqlInsert = `update VEHICLE set STATUS= ${status}, LAST_UPDATED_BY=${userId}, LAST_UPDATE_DATE='${date.toISOString()}'  where VIN='${vin}'`
+
+            const queryResult = Utils.ExecSQL(sqlInsert);
+            resolve(queryResult);
+        } catch (err) {
+            console.error("ERROR: ", err);
+            reject(err);
+        }
+    });
+};
 
 
 export default Users;

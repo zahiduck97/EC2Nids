@@ -1,11 +1,14 @@
-import { Request, Response, Router } from 'express';
+import {Request, Response, Router} from 'express';
 import Utils from "../utils/utils";
 import userRepository from "../repository/user.repository";
+const { closeConnection } = require('../config/config');
+
 const XLSX = require('xlsx');
+const papa = require('papaparse');
 
 const router = Router();
 
-router.post('/', async (req: Request, res: Response, next) => {
+router.post('/nsc', async (req: Request, res: Response, next) => {
     try {
         // Validate Token
         const headers = req.headers;
@@ -83,7 +86,7 @@ router.post('/', async (req: Request, res: Response, next) => {
             const vehicle: any = await userRepository.validateVehicle(row.VIN);
             if (vehicle.length === 0) {
                 por = await userRepository.getPorFromPlant(row['ORIGEN DE PRODUCCION'])
-                if(por === 0) {
+                if (por === 0) {
                     errores.push({vin: row.VIN, error: "Invalid Plant Code"});
                     continue;
                 }
@@ -264,6 +267,179 @@ router.post('/', async (req: Request, res: Response, next) => {
         await userRepository.executeQuery(`COMMIT;`)
 
         res.status(200).send()
+    } catch (e) {
+        console.error("Error procesando el archivo CSV: ", e);
+        await userRepository.executeQuery(`ROLLBACK;`)
+        next(e)
+    }
+});
+
+router.post('/tracking', async (req: Request, res: Response, next) => {
+    try {
+        // Validate Token
+        const headers = req.headers;
+        const token = await Utils.decodeToken(headers);
+        const errores = [];
+
+        // Validar Body
+        const requestData = req.body;
+        const fileType = requestData.fileType;
+        const base64Data = requestData.base64Data;
+        if (!base64Data) return Utils.errorResponse(500, "Invalid Body", res);
+
+        // Separar y obtener el base64
+        const base64ContentArray = base64Data.split(';base64,');
+        const base64Content = base64ContentArray.length > 1 ? base64ContentArray[1] : base64ContentArray[0];
+
+        // Decodificar base64 a texto
+        const buffer = Buffer.from(base64Content, 'base64').toString('utf-8');
+        let results;
+        let esCsv;
+        if (fileType === 'csv') {
+            // Parsear CSV
+            results = papa.parse(buffer, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true
+            }).data;
+            // Datos en forma de array de objetos
+            esCsv = true;
+        } else if (fileType === 'txt') {
+            // Dividir el texto en líneas
+            results = buffer.split('\n');
+            esCsv = false;
+        } else {
+            return Utils.errorResponse(500, "Invalid File Type");
+        }
+
+        const tipoMap = {
+            10: {value: 10, name: 'PORT_START_SHIPMENT'},
+            11: {value: 11, name: 'PORT_START_IN'},
+            12: {value: 12, name: 'PORT_END_SHIPMENT'},
+            15: {value: 15, name: 'PORT_END_IN'},
+            16: {value: 16, name: 'FISCAL_AREA_SHIPMENT'},
+            17: {value: 17, name: 'FISCAL_AREA_IN'},
+            18: {value: 18, name: 'VPC_SHIPMENT'},
+            19: {value: 19, name: 'VPC_IN'},
+            20: {value: 20, name: 'DEALER_SHIPMENT'},
+            21: {value: 21, name: 'DEALER_IN'}
+        };
+
+        // Validar que tus permisos te permita crear
+        const permisos = await userRepository.getPermisosById(token.user.userId);
+        if (permisos.length === 0) {
+            return Utils.errorResponse(500, "Invalid User Id", res);
+        }
+        if (!permisos[0].WRITE_PERMITION) {
+            // En este caso se corta la petición porque para todos dará el mismo error
+            return Utils.errorResponse(500, "You Do Not Have Permissions To Create", res);
+        }
+        const events = [];
+        const vehicles = [];
+        const today = new Date();
+        const nDate = new Date();
+        nDate.setHours(6, 0, 0, 0);
+
+        // Procesar cada línea
+        for (const line of results) {
+            const registro = (esCsv) ? line :
+                {
+                    INT: +line.substring(1, 3).trim(),
+                    NSC: line.substring(3, 7).trim(),
+                    VIN: line.substring(7, 24).trim(),
+                    FECHA: line.substring(24, 32).trim(),
+                    HORA: line.substring(32, 38).trim(),
+                }
+
+            if(!registro.VIN) {
+                continue;
+            }
+
+            const tipo = tipoMap[registro.INT];
+            if (!tipo) {
+                errores.push({vin: registro.VIN, error: `Invalid interface number: ${registro.INT}`});
+                continue;
+            }
+            const date = (esCsv) ? Utils.convertToSpecificTime(registro.FECHA.toString())
+                : Utils.convertToSpecificTimeStartsByDayWithHour(registro.FECHA, registro.HORA);
+
+            // Validate Vin
+            const vehicle = await userRepository.findVehicleByVin(registro.VIN);
+            if (vehicle.length === 0) {
+                errores.push({vin: registro.VIN, error: "Invalid Vin"});
+                continue;
+            }
+
+            // Validate the date is not greater than today
+            if (date > today) {
+                errores.push({vin: registro.VIN, error: "Date Greater than today"});
+                continue;
+            }
+
+            // Validate Production exists
+            // And if you are not admin, check the vin belongs to your country
+            const idProduction = await userRepository.findProductionByVinAndGetDate(registro.VIN, token.user.rolId, token.user.countryId);
+            if (idProduction.length === 0) {
+                errores.push({vin: registro.VIN, error: "The Vin does not exist on production or Belongs to another Country"});
+                continue;
+            }
+            if (date < new Date(idProduction[0].PLANNED_ACTUAL_OFFLINE_DATE)) {
+                errores.push({vin: registro.VIN, error: "Date Before production date"});
+                continue;
+            }
+
+
+            // Check event Duplicated
+            const countRegistroEvent = await userRepository.countEventByNameType(registro.VIN, tipo.value);
+            if (countRegistroEvent[0].COUNT > 0) {
+                errores.push({vin: registro.VIN, error: "Event Already assigned"});
+                continue;
+            }
+
+            // Para 10 o 15 se valida production, lo cual ya se hizo
+            // Para 16 - 21 se Valida portEnd IN - 15
+            if (tipo.value >= 16 && tipo.value <= 21) {
+                const countEvent = await userRepository.countEventByNameType(registro.VIN, 15);
+                if (countEvent.length === 0) {
+                    errores.push({vin: registro.VIN, error: "Event does not have Event Port End IN"});
+                    continue;
+                }
+
+            }
+
+            // Save Event
+            events.push({
+                TYPE: tipo.value,
+                CODE: (esCsv) ? registro.UBICACION : registro.NSC,
+                NAME: tipo.name,
+                EVENT_DATE: date.toISOString(),
+                VIN_TEMP: registro.VIN
+            })
+            // const eventId = await userRepository.getLastEventId();
+            // await userRepository.insertEvent(eventId[0].EVENT_ID, tipo.value, (esCsv) ? registro.UBICACION :
+            //     registro.NSC, tipo.name, date, token.user.userId, registro.VIN);
+
+            // Actualizar la tabla de vehiculos
+            // await userRepository.updateVehicleStatus(tipo.value, registro.VIN, token.user.userId);
+            vehicles.push({
+                STATUS: tipo.value,
+                VIN: registro.VIN
+            })
+        }
+        await userRepository.executeQuery(`BEGIN;`)
+
+        if (events.length > 0) {
+            await userRepository.insertEventMasive(events, token.user.userId, nDate.toISOString());
+        }
+        if (vehicles.length > 1) {
+            await userRepository.updateVehicleStatusMasive(vehicles, token.user.userId, nDate.toISOString());
+        } else if(vehicles.length === 1) {
+            await userRepository.updateVehicleStatus(vehicles[0].STATUS, vehicles[0].VIN, token.user.userId);
+        }
+        await userRepository.executeQuery(`COMMIT;`)
+
+        await closeConnection();
+        Utils.buildResponseForLambda(200, "Archivo Procesado correctamente", errores, res);
     } catch (e) {
         console.error("Error procesando el archivo CSV: ", e);
         await userRepository.executeQuery(`ROLLBACK;`)

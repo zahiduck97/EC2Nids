@@ -40,4 +40,24 @@ const getConnection = async function getConnection() {
     }
 };
 
-module.exports = { getConnection }
+const closeConnection = async () => {
+    return new Promise((resolve, reject) => {
+        if (connection) {
+            connection.destroy((err, conn) => {
+                if (err) {
+                    console.error('Unable to close the connection:', err);
+                    reject(err); // Manejar el error como prefieras
+                } else {
+                    console.log('Connection successfully closed');
+                    resolve(true);
+                }
+            });
+            connection = null; // Asegurarse de resetear el objeto de conexión
+        } else {
+            console.log('No connection to close');
+            resolve(false); // Indicar que no había conexión para cerrar
+        }
+    });
+};
+
+module.exports = { getConnection, closeConnection };

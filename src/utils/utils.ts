@@ -101,4 +101,37 @@ Utils.convertToSpecificTime = (str) => {
     }
 }
 
+Utils.convertToSpecificTimeStartsByDayWithHour = (fecha, hora) => {
+    try {
+        // Convertir la cadena a fecha
+        if (fecha.length !== 8 || isNaN(fecha) || fecha === '' || hora.length !== 6) {
+            return null;
+        }
+
+        const day = fecha.substring(0, 2);
+        const month = fecha.substring(2, 4);
+        const year = fecha.substring(4, 8);
+        const hours = hora.substring(0, 2);
+        const minutes = hora.substring(2, 4);
+        const seconds = hora.substring(4, 6);
+
+        // Crear un objeto Date con la fecha
+        const date = new Date(year, month - 1, day, hours, minutes, seconds);
+        date.setTime(date.getTime() + (6 * 60 * 60 * 1000));
+
+
+        return date;
+    } catch (e) {
+        console.error("❌ Error: ", e);
+    }
+}
+
+Utils.buildResponseForLambda = (code, message, errors, res) => {
+    res.status(code).json({
+        status: "success",
+        message,
+        errors
+    })
+}
+
 export default Utils;
