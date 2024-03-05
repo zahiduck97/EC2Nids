@@ -59,7 +59,6 @@ Utils.ExecSQLQuery = async (sql, params) => {
 Utils.ExecSQL = async (sql) => {
     try {
         const Connection = await getConnection();
-        console.log('saliendo de la conexion')
         return new Promise((resolve, reject) => {
             Connection.execute({
                 sqlText: sql,
@@ -68,7 +67,6 @@ Utils.ExecSQL = async (sql) => {
                         console.error('Failed to execute statement due to the following error: ' + err.message);
                         reject(err.message)
                     } else {
-                        console.log('se logro')
                         resolve(rows);
                     }
                 }
@@ -78,5 +76,29 @@ Utils.ExecSQL = async (sql) => {
         console.error("Error al obtener la conexión: ", error);
     }
 };
+
+Utils.convertToSpecificTime = (str) => {
+    try {
+        // Convertir la cadena a fecha
+        if (str.length !== 8 || isNaN(str) || str === '') {
+            return null;
+        }
+
+        const year = str.substring(0, 4);
+        const month = str.substring(4, 6);
+        const day = str.substring(6, 8);
+
+        // Crear un objeto Date con la fecha
+        const date = new Date(year, month - 1, day);
+
+        // Ajustar la hora a las 6:00:00
+        date.setHours(6, 0, 0, 0);
+
+
+        return date;
+    } catch (e) {
+        console.error("❌ Error: ", e);
+    }
+}
 
 export default Utils;

@@ -4,7 +4,6 @@ let connection;
 const getConnection = async function getConnection() {
     try {
         if (connection) {
-            console.log('Reutilizando Conexion')
             return connection;
         }
 
@@ -24,7 +23,6 @@ const getConnection = async function getConnection() {
             schema: connectionString.schema
         });
 
-        console.log('Creando conexion')
 
         return new Promise((resolve, reject) => {
             connection.connect(function (err, conn) {
