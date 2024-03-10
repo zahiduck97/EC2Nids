@@ -382,5 +382,54 @@ Users.updateVehicleStatus = async (status, vin, userId) => {
     });
 };
 
+Users.getLogFile = async (menu, userId) => {
+    try {
+        console.info("✅ getLogFile: ");
+        const sqlInsert = `SELECT RECORDS, RECORDS_LOADED, STATUS, ERROR  FROM UTL_DATAFILE_LOG
+            WHERE ID_MENU = ? AND CREATED_BY = ? ORDER BY ID DESC LIMIT 1`;
+        return Utils.ExecSQLQuery(sqlInsert, [menu, userId]);
+    } catch (err) {
+        console.error("ERROR: ", err);
+        throw err;
+    }
+};
+
+Users.insertLogFile = async (menu, records, loaded, status, userId, date) => {
+    try {
+        const sqlInsert = `INSERT INTO UTL_DATAFILE_LOG (ID_MENU, RECORDS, RECORDS_LOADED, STATUS, ERROR, CREATED_BY, CREATION_DATE) VALUES(?,?,?,?,?,?,?);`;
+        console.info("✅ insertLogFile: ");
+        return await Utils.ExecSQLQuery(sqlInsert, [menu, records, loaded, status, null, userId, date]);
+    } catch (err) {
+        console.error("ERROR: ", err);
+        throw err;
+    }
+};
+
+Users.updateLogFile = async (loaded, menu, userId) => {
+    try {
+        const sqlInsert = `UPDATE UTL_DATAFILE_LOG
+            SET RECORDS_LOADED = ?
+            WHERE ID_MENU = ? AND CREATED_BY = ?`;
+        console.info("✅ updateLogFile: ");
+        return await Utils.ExecSQLQuery(sqlInsert, [loaded, menu, userId]);
+    } catch (err) {
+        console.error("ERROR: ", err);
+        throw err;
+    }
+};
+
+Users.completeLogFile = async (loaded, status, error, menu, userId) => {
+    try {
+        console.info("✅ completeLogFile: ");
+        const sqlInsert = `UPDATE UTL_DATAFILE_LOG
+            SET RECORDS_LOADED = ?, STATUS = ?, ERROR = ?
+            WHERE ID_MENU = ? AND CREATED_BY = ?`;
+        return Utils.ExecSQLQuery(sqlInsert, [loaded, status, JSON.stringify(error), menu, userId]);
+    } catch (err) {
+        console.error("ERROR: ", err);
+        throw err;
+    }
+};
+
 
 export default Users;

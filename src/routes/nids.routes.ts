@@ -2,6 +2,7 @@ import {Request, Response, Router} from 'express';
 import Utils from "../utils/utils";
 import userRepository from "../repository/user.repository";
 const { closeConnection } = require('../config/config');
+const axios = require('axios')
 
 const XLSX = require('xlsx');
 const papa = require('papaparse');
@@ -67,10 +68,22 @@ router.post('/nsc', async (req: Request, res: Response, next) => {
         let events = [];
         const nDate = new Date();
         nDate.setHours(6, 0, 0, 0);
+        let contador = 0;
+        let acumulado = 0;
+        const BATCH_SIZE = 10;
 
         await userRepository.executeQuery(`BEGIN;`)
+        /*
+        Para Menu: 1 -NSC
+        Para Status: 1 - En Proceso, 2 - Finalizado con Éxito, 3 - Error
+         */
+
+        await userRepository.insertLogFile(1, jsonData.length, 0, 1, token.user.userId, nDate.toISOString());
+        console.log(`Datos a procesar: ${jsonData.length}`)
 
         for (const row of jsonData) {
+            contador++;
+
             // Validate Vin Length
             if (row.VIN.length !== 17) {
                 errores.push({vin: row.VIN, error: "The VIN must be 17 characters"});
@@ -252,17 +265,27 @@ router.post('/nsc', async (req: Request, res: Response, next) => {
                     SALES_TYPE_ID: vmc
                 });
             }
-        }
-        await userRepository.executeQuery(`COMMIT;`)
 
-        await userRepository.executeQuery(`BEGIN;`)
+            // Si ya se procesaron 10 registros, se actualiza el log File
+            if (contador % BATCH_SIZE === 0) {
+                console.log(`Procesando 10 Registros`)
+                acumulado += 10;
+                console.log(`Vamos en el ${acumulado}`)
+                await userRepository.updateLogFile(acumulado, 1, token.user.userId);
+            }
+        }
+        console.log('Salimos del for')
+        // await userRepository.executeQuery(`COMMIT;`)
+        //
+        // await userRepository.executeQuery(`BEGIN;`)
         await Promise.all([
             productions.length > 0 ? userRepository.insertProductionMasive(productions, token.user.userId, nDate.toISOString()) : null,
             salesArr.length > 0 ? userRepository.insertSaleMasive(salesArr, token.user.userId, nDate.toISOString()) : null,
             invoices.length > 0 ? userRepository.insertInvoiceFileMasive(invoices, token.user.userId, nDate.toISOString()) : null,
             events.length > 0 ? userRepository.insertEventWithouthIdMasive(events, token.user.userId, nDate.toISOString()) : null,
             shipments.length > 0 ? userRepository.insertShipmentMasive(shipments, token.user.userId, nDate.toISOString()) : null,
-            nscInvoices.length > 0 ? userRepository.insertNscInvoiceMasive(nscInvoices, token.user.userId, nDate.toISOString()) : null
+            nscInvoices.length > 0 ? userRepository.insertNscInvoiceMasive(nscInvoices, token.user.userId, nDate.toISOString()) : null,
+            userRepository.completeLogFile(jsonData.length, 2, errores, 1, token.user.userId)
         ].filter(p => p !== null));
         await userRepository.executeQuery(`COMMIT;`)
 
@@ -309,7 +332,7 @@ router.post('/tracking', async (req: Request, res: Response, next) => {
             results = buffer.split('\n');
             esCsv = false;
         } else {
-            return Utils.errorResponse(500, "Invalid File Type");
+            return Utils.errorResponse(500, "Invalid File Type", res);
         }
 
         const tipoMap = {
@@ -447,4 +470,29 @@ router.post('/tracking', async (req: Request, res: Response, next) => {
     }
 });
 
+router.get('/statusLogFile', async (req: Request, res: Response, next) => {
+    try {
+        const queryParams = req.query;
+        // console.log(queryParams)
+
+        // Leer Data
+        const requestData = req.body;
+        // console.log(requestData)
+
+        // Validate Token
+        const headers = req.headers;
+        // console.log(headers)
+        const token = await Utils.decodeToken(headers);
+
+        const aux = await userRepository.getLogFile(+queryParams.menu, token.user.userId);
+        console.log(aux)
+
+        res.status(200).send();
+
+    } catch (e) {
+        console.error("Error procesando el archivo CSV: ", e);
+        await userRepository.executeQuery(`ROLLBACK;`)
+        next(e)
+    }
+});
 export default router;

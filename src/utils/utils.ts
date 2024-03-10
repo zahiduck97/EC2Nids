@@ -1,5 +1,6 @@
 const jwt_decode = require('jwt-decode');
 const { getConnection } = require('../config/config');
+const XLSX = require('xlsx');
 
 const Utils = () => {};
 
@@ -132,6 +133,21 @@ Utils.buildResponseForLambda = (code, message, errors, res) => {
         message,
         errors
     })
+}
+
+Utils.decodeXLS = (base64Content) => {
+    // Decodificar base64 a un buffer
+    const buffer = Buffer.from(base64Content, 'base64');
+
+    // Leer el archivo Excel desde el buffer
+    const workbook = XLSX.read(buffer, {type: 'buffer'});
+
+    // Suponiendo que solo hay una hoja y quieres los datos de esa hoja
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+
+    // Convertir la hoja de Excel a JSON
+    return XLSX.utils.sheet_to_json(worksheet);
 }
 
 export default Utils;
