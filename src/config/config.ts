@@ -7,7 +7,7 @@ const getConnection = async function getConnection() {
             return connection;
         }
 
-        const dataB64 = "ewogICAiYWNjZXNzVXJsIjoiaHR0cHM6Ly9uaXNzYW5uZXh0Z2VuLnVzLWVhc3QtMS5wcml2YXRlbGluay5zbm93Zmxha2Vjb21wdXRpbmcuY29tIiwKICAgImluc2VjdXJlQ29ubmVjdCI6dHJ1ZSwKICAgImFjY291bnQiOiJOSVNTQU5BTUVSSUNBUy1OSVNTQU5ORVhUR0VOIiwKICAgInVzZXJuYW1lIjoiTklEU19MQU1CREFfV0VCQVBQX1NWQ19QUkQiLAogICAicGFzc3dvcmQiOiIqJW4uVC1fMkA0I1U3eUAuNX5ja2EpTzkjSWtMVEAodl4kUiIsCiAgICJkYXRhYmFzZSI6IlNQREJOSURTIiwKICAgInNjaGVtYSI6Ik5JRFNfU1RHIgp9";
+        const dataB64 = "eyJhY2Nlc3NVcmwiOiJodHRwczovL25pc3NhbmFtZXJpY2FzLW5tZXgucHJpdmF0ZWxpbmsuc25vd2ZsYWtlY29tcHV0aW5nLmNvbSIsImluc2VjdXJlQ29ubmVjdCI6dHJ1ZSwiYWNjb3VudCI6Ik5JU1NBTkFNRVJJQ0FTLU5NRVgiLCJ1c2VybmFtZSI6Ik5JRFNfQVdTX0xBTUJEQV9TVkNfREVWIiwicGFzc3dvcmQiOiItLH4zJW0pZzFqPSQkNDYmd0lCO04kJDI+eU8lN3k+KF5VQCIsImRhdGFiYXNlIjoiU0REQk5JRFMiLCJzY2hlbWEiOiJOSURTX1NURyJ9\n";
 
         let buff = Buffer.from(dataB64, 'base64');
         let text = buff.toString('ascii');

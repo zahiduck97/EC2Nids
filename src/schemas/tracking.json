@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "definitions": {
+  },
+  "type": "object",
+  "title": "Tracking",
+  "required": [
+    "INT",
+    "UBICACION",
+    "VIN",
+    "FECHA"
+  ],
+  "properties": {
+    "INT": {
+      "type": "number"
+    },
+    "UBICACION": {
+      "type": "string"
+    },
+    "VIN": {
+      "type": "string"
+    },
+    "FECHA": {
+      "type": "number"
+    },
+    "HORA": {
+      "type": "string"
+    }
+  }
+}

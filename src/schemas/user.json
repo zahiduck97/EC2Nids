@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "definitions": {
+  },
+  "type": "object",
+  "title": "User",
+  "required": [
+    "email",
+    "username",
+    "name",
+    "lastname",
+    "rolId",
+    "countryId",
+    "password"
+  ],
+  "properties": {
+    "email": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "lastname": {
+      "type": "string"
+    },
+    "rolId": {
+      "type": "number"
+    },
+    "countryId": {
+      "type": "number"
+    },
+    "password": {
+      "type": "string"
+    }
+  }
+}

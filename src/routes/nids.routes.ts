@@ -3,6 +3,7 @@ import Utils from "../utils/utils";
 import userRepository from "../repository/user.repository";
 const { closeConnection } = require('../config/config');
 const axios = require('axios')
+const validar = require("../utils/error");
 
 const XLSX = require('xlsx');
 const papa = require('papaparse');
@@ -489,6 +490,243 @@ router.get('/statusLogFile', async (req: Request, res: Response, next) => {
 
         res.status(200).send();
 
+    } catch (e) {
+        console.error("Error procesando el archivo CSV: ", e);
+        await userRepository.executeQuery(`ROLLBACK;`)
+        next(e)
+    }
+});
+
+router.post('/factCliente', async (req: Request, res: Response, next) => {
+    try {
+        // Variables
+        const queryParams = req.query;
+        let result;
+        const errores = [];
+        const nDate = new Date();
+        const requestData = req.body
+        let acumulado = 0;
+        let menu;
+
+        // Validate Token
+        const headers = req.headers;
+        const token = await Utils.decodeToken(headers);
+
+        // Validar Body
+        const fileType = requestData.fileType;
+
+        // Variables
+        let resultsSinProcesar;
+        let inter;
+        let validateBody;
+        let resultsProcesados;
+        let DFECHA_FACTURA;
+        let DFECHA_NACIMIENTO;
+        let DFECHA_ENTREGA_CLIENTE;
+
+        // Validar Tipo de archivo
+        if (fileType === 'csv') {
+            resultsSinProcesar = Utils.decodeCsv(requestData, false);
+            inter = resultsSinProcesar[0][0];
+            resultsProcesados = resultsSinProcesar.map(result => Utils.getFactClienteCSV(result, inter));
+        } else if (fileType === 'txt') {
+            resultsSinProcesar = Utils.decodeTxt(requestData);
+            inter = +resultsSinProcesar[0].substring(1, 3);
+            resultsProcesados = resultsSinProcesar.map(result => Utils.getFactClienteTXT(result, inter));
+            // Para que las validaciones y la logica sea la misma que los csv
+            inter += 100;
+        } else {
+            return Utils.errorResponse(500, "Invalid File Type", res);
+        }
+
+        // Validar que tus permisos te permita crear
+        const permisos = await userRepository.getPermisosById(token.user.userId);
+        console.log(permisos)
+        if (permisos.length === 0) {
+            return Utils.errorResponse(500, "Invalid User Id", res);
+        }
+        if (!permisos[0].WRITE_PERMITION) {
+            // En este caso se core la petición porque para todos dará el mismo error
+            return Utils.errorResponse(500, "You Do Not Have Permissions To Create", res);
+        }
+
+        // Others Variables
+        const salesIdMap = {
+            'T': 1,
+            'F': 2,
+            'E': 3
+        };
+        let contador = 0;
+        const BATCH_SIZE = 10;
+
+        /*
+        Para Menu: 1 -NSC, 2 - Tracking, 3 - National Register, 4 -Fact Cliente
+        Para Status: 1 - En Proceso, 2 - Finalizado con Éxito, 3 - Error
+         */
+        menu = 4;
+        // await userRepository.insertLogFile(menu, resultsProcesados.length, 0, 1, token.user.userId, nDate.toISOString());
+
+        // const aux = await userRepository.getLogFileId(menu, token.user.userId);
+        // const id = aux[0].ID;
+
+        for (const registro of resultsProcesados) {
+            if(registro.VIN === '') {
+                continue;
+            }
+            console.log(JSON.stringify(registro, null, 2));
+
+            validateBody = (inter === 127 || inter === 140) ? require('../schemas/factCliente27-40.json')
+                : require('../schemas/factCliente28-41.json')
+
+            DFECHA_FACTURA = Utils.convertToSpecificTimeStartsByDay(registro.DFECHA_FACTURA);
+            DFECHA_ENTREGA_CLIENTE = Utils.convertToSpecificTimeStartsByDay(registro.DFECHA_ENTREGA_CLIENTE);
+            if (inter === 127 || inter === 140) DFECHA_NACIMIENTO = Utils.convertToSpecificTimeStartsByDay(registro.DFECHA_NACIMIENTO);
+
+            // Validar Body
+            const aux = validar(registro, validateBody);
+            console.log(aux)
+            if (!aux.status) {
+                errores.push({vin: registro.VIN, error: `The necessary parameters. They were not sent.`});
+                continue;
+            }
+
+            contador++;
+
+            // Crear id's Necesarios
+            let addresId;
+            let personId;
+            let customerId;
+            let eventId;
+
+            // Validate Address or Insert One
+            const country = await userRepository.getCountryId(registro.VPAIS);
+            if (!country) {
+                errores.push({vin: registro.VIN, error: "Invalid Country"});
+                continue;
+            }
+            const address = await userRepository.validateAddress(registro.VCALLE, registro.VCOLONIA, registro.VCPOSTAL,
+                registro.VDELEGACION_MUNICIPIO, registro.VCIUDAD, country);
+            if (address.length !== 0) {
+                addresId = address[0].ADDRESS_ID;
+            } else {
+                await userRepository.insertAddress(registro.VCALLE, registro.VNUMERO, registro.VCOLONIA, registro.VCPOSTAL,
+                    registro.VDELEGACION_MUNICIPIO, registro.VCIUDAD, country, token.user.userId);
+                const newAddress = await userRepository.getLastAddressId();
+                addresId = newAddress[0].ADDRESS_ID
+            }
+
+            // Validate Person or Insert One for 27 or 40
+            // validate company or insert one for 28 or 41
+            if (inter === 127 || inter === 140) {
+                const person = await userRepository.validatePerson(registro.VNOMBRE_CLIENTE, registro.VAPELLIDO_PATERNO,
+                    registro.VSEXO, DFECHA_NACIMIENTO, registro.VRFC);
+                if (person.length !== 0) {
+                    personId = person[0].PERSON_ID;
+                } else {
+                    await userRepository.insertPerson(registro.VNOMBRE_CLIENTE, registro.VAPELLIDO_PATERNO, registro.VAPELLIDO_MATERNO,
+                        registro.VSEXO, registro.VESTADO_CIVIL, registro.VRFC, DFECHA_NACIMIENTO, registro.VTELEFONO_CASA,
+                        registro.VEMAIL, registro.VDESEA_SER_CONTACTADO === 'Y' ? 1 : 0, addresId,
+                        registro.VCELULAR, token.user.userId)
+                    const newPerson = await userRepository.validatePerson(registro.VNOMBRE_CLIENTE, registro.VAPELLIDO_PATERNO,
+                        registro.VSEXO, DFECHA_NACIMIENTO, registro.VRFC);
+                    personId = newPerson[0].PERSON_ID
+                }
+            } else {
+                const company = await userRepository.validateCompany(registro.VNOMBRE_CLIENTE, registro.VRFC)
+                if (company.length !== 0) {
+                    personId = company[0].COMPANY_ID;
+                } else {
+                    await userRepository.insertCompany(registro.VNOMBRE_CLIENTE, registro.VRFC, addresId, token.user.userId);
+                    const newcompany = await userRepository.validateCompany(registro.VNOMBRE_CLIENTE, registro.VRFC)
+                    personId = newcompany[0].COMPANY_ID;
+                }
+            }
+
+            // Insert Customer
+            if (inter === 127 || inter === 140) {
+                const person = await userRepository.validateCustomer(personId, 'PERSON_ID');
+                if(person.length !== 0) {
+                    customerId = person[0].CUSTOMER_ID;
+                } else {
+                    await userRepository.insertCustomer(personId, token.user.userId)
+                    const newPerson = await userRepository.validateCustomer(personId, 'PERSON_ID');
+                    customerId = newPerson[0].CUSTOMER_ID;
+                }
+            } else {
+                const person = await userRepository.validateCustomer(personId, 'COMPANY_ID');
+                if(person.length !== 0) {
+                    customerId = person[0].CUSTOMER_ID;
+                } else {
+                    await userRepository.insertCustomerCompany(personId, token.user.userId);
+                    const newPerson = await userRepository.validateCustomer(personId, 'COMPANY_ID');
+                    customerId = newPerson[0].CUSTOMER_ID;
+                }
+            }
+
+            // Validate Invoice to Insert One
+            const invoice = await userRepository.validateInvoice(registro.VNUMERO_FACTURA, registro.VIN, DFECHA_FACTURA);
+            if (invoice.length === 0) {
+                const payment = await userRepository.getPaymentTerms(registro.VPOLITICA_VENTA, 'RETAIL');
+                if (!payment) {
+                    errores.push({vin: registro.VIN, error: "The payment Does not Exists"});
+                    continue;
+                }
+                const total = registro.NIMPORTE_FACTURA + registro.NIMPUESTO_FACTURA + registro.NACCESORIOS_FACTURA;
+                const currency = (registro.NTIPO_CAMBIO === 1 || registro.NTIPO_CAMBIO === 0) ? 'USD' : 'LOCAL';
+                await userRepository.insertInvoiceCliente(registro.VIN, registro.VNUMERO_FACTURA, DFECHA_FACTURA,
+                    registro.NIMPORTE_FACTURA, registro.NIMPUESTO_FACTURA, registro.NACCESORIOS_FACTURA, registro.NTIPO_CAMBIO,
+                    payment, registro.VPLAZO_VENTA, total, currency, token.user.userId);
+            }
+
+            // Validate Event
+            const event = await userRepository.validateEvent(registro.VIN, 24);
+            if (event.length === 0) {
+                await userRepository.insertEventClient(24, registro.VNUMERO_FACTURA, 'CUSTOMER_INVOICE',
+                    DFECHA_FACTURA, registro.VIN, token.user.userId);
+                const newEvent = await userRepository.getLastEventId()
+                eventId = newEvent[0].EVENT_ID;
+            } else {
+                eventId = event[0].EVENT_ID;
+            }
+
+            // Validate Customer Invoice to Insert One
+            const customer = await userRepository.validateCustomerInvoice(registro.VIN, registro.VNUMERO_FACTURA);
+            if (customer.length === 0 || customer[0]?.CUSTOMER_ID === null) {
+                const salesId = salesIdMap[registro.VVMC] || 0;
+                (inter === 127 || inter === 140) ?
+                    await userRepository.insertCustomerInvoice(registro.VIN, customerId, registro.VNUMERO_FACTURA,
+                        registro.VDEALER, salesId, eventId, token.user.userId) :
+                    await userRepository.insertCustomerInvoiceCompany(registro.VIN, customerId, registro.VNUMERO_FACTURA,
+                        registro.VDEALER, salesId, eventId, token.user.userId);
+            }
+
+
+            // Validate Fecha Entrega Cliente
+            if (DFECHA_ENTREGA_CLIENTE) {
+                const delivery = await userRepository.validateCustomerDelivery(registro.VNUMERO_FACTURA, registro.VIN);
+                if (delivery.length === 0) {
+                    await userRepository.insertCustomerDeliveryCliente(registro.VNUMERO_FACTURA, registro.VIN, customerId,
+                        registro.VVMC, DFECHA_ENTREGA_CLIENTE, token.user.userId);
+                }
+
+                const eventCustomer = await userRepository.validateEvent(registro.VIN, 29)
+                if (eventCustomer.length === 0) {
+                    await userRepository.insertEventClient(29, customerId, 'CUSTOMER_DELIVERY',
+                        DFECHA_ENTREGA_CLIENTE, registro.VIN, token.user.userId);
+                }
+            }
+
+            // Si ya se procesaron 10 registros, se actualiza el log File
+            if (contador % BATCH_SIZE === 0) {
+                acumulado += 10;
+                // await userRepository.updateLogFileID(acumulado, id);
+            }
+        }
+
+        // await userRepository.completeLogFile(resultsProcesados.length, 2, errores, menu, token.user.userId)
+        // await closeConnection();
+
+        res.status(200).send()
     } catch (e) {
         console.error("Error procesando el archivo CSV: ", e);
         await userRepository.executeQuery(`ROLLBACK;`)

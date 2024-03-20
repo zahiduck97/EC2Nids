@@ -1,0 +1,130 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "definitions": {
+  },
+  "type": "object",
+  "title": "Facturacion Cliente 27 Interface",
+  "required": [
+    "VIN",
+    "VDEALER",
+    "VNUMERO_FACTURA",
+    "DFECHA_FACTURA",
+    "NIMPORTE_FACTURA",
+    "NIMPUESTO_FACTURA",
+    "NACCESORIOS_FACTURA",
+    "NTIPO_CAMBIO",
+    "VPOLITICA_VENTA",
+    "VVMC",
+    "VPLAZO_VENTA",
+    "VNOMBRE_CLIENTE",
+    "VAPELLIDO_PATERNO",
+    "VAPELLIDO_MATERNO",
+    "VSEXO",
+    "VESTADO_CIVIL",
+    "DFECHA_NACIMIENTO",
+    "VRFC",
+    "VCALLE",
+    "VNUMERO",
+    "VCOLONIA",
+    "VCPOSTAL",
+    "VDELEGACION_MUNICIPIO",
+    "VCIUDAD",
+    "VPAIS",
+    "VTELEFONO_CASA",
+    "VCELULAR",
+    "VEMAIL",
+    "VDESEA_SER_CONTACTADO"
+  ],
+  "properties": {
+    "VIN": {
+      "type": "string"
+    },
+    "VDEALER": {
+      "type": "string"
+    },
+    "VNUMERO_FACTURA": {
+      "type": "string"
+    },
+    "DFECHA_FACTURA": {
+      "type": "string"
+    },
+    "NIMPORTE_FACTURA": {
+      "type": "number"
+    },
+    "NIMPUESTO_FACTURA": {
+      "type": "number"
+    },
+    "NACCESORIOS_FACTURA": {
+      "type": "number"
+    },
+    "NTIPO_CAMBIO": {
+      "type": "number"
+    },
+    "VPOLITICA_VENTA": {
+      "type": "string"
+    },
+    "VVMC": {
+      "type": "string"
+    },
+    "VPLAZO_VENTA": {
+      "type": "string"
+    },
+    "VNOMBRE_CLIENTE": {
+      "type": "string"
+    },
+    "VAPELLIDO_PATERNO": {
+      "type": "string"
+    },
+    "VAPELLIDO_MATERNO": {
+      "type": "string"
+    },
+    "VSEXO": {
+      "type": "string"
+    },
+    "VESTADO_CIVIL": {
+      "type": "string"
+    },
+    "DFECHA_NACIMIENTO": {
+      "type": "string"
+    },
+    "VRFC": {
+      "type": "string"
+    },
+    "VCALLE": {
+      "type": "string"
+    },
+    "VNUMERO": {
+      "type": "string"
+    },
+    "VCOLONIA": {
+      "type": "string"
+    },
+    "VCPOSTAL": {
+      "type": "number"
+    },
+    "VDELEGACION_MUNICIPIO": {
+      "type": "string"
+    },
+    "VCIUDAD": {
+      "type": "string"
+    },
+    "VPAIS": {
+      "type": "string"
+    },
+    "VTELEFONO_CASA": {
+      "type": "number"
+    },
+    "VCELULAR": {
+      "type": "number"
+    },
+    "VEMAIL": {
+      "type": "string"
+    },
+    "DFECHA_ENTREGA_CLIENTE": {
+      "type": "string"
+    },
+    "VDESEA_SER_CONTACTADO": {
+      "type": "string"
+    }
+  }
+}
